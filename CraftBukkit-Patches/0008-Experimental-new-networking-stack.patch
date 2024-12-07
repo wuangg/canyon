@@ -1,4 +1,4 @@
-From 4a4977cdc84efbae2aae028e9388a84484cbbd0e Mon Sep 17 00:00:00 2001
+From ddf97008e47af51c734c2f3ed574c03f9bd8d585 Mon Sep 17 00:00:00 2001
 From: Andrew Steinborn <git@steinborn.me>
 Date: Thu, 22 Aug 2019 23:12:21 -0400
 Subject: [PATCH] Experimental new networking stack
@@ -14,10 +14,31 @@ modify the packet reader and writer to manipulate packets. An alternative
 API may be provided in the future.
 
 diff --git a/pom.xml b/pom.xml
-index d5dcc0d44..7d6f94712 100644
+index d5dcc0d44..a7cd26be2 100644
 --- a/pom.xml
 +++ b/pom.xml
-@@ -79,14 +79,14 @@
+@@ -22,6 +22,11 @@
+     <url>https://github.com/Bukkit/CraftBukkit</url>
+   </scm>
+   <repositories>
++    <!-- Canyon: add velocity repo -->
++    <repository>
++      <id>velocity-repo</id>
++      <url>https://repo.velocitypowered.com/snapshots/</url>
++    </repository>
+     <repository>
+       <id>bukkit-repo</id>
+       <url>https://raw.githubusercontent.com/canyonmodded/mc-server/main</url> <!-- Canyon: replace repo -->
+@@ -76,17 +81,23 @@
+       <type>jar</type>
+       <scope>compile</scope>
+     </dependency>
++    <!-- Canyon - include velocity-native -->
++    <dependency>
++      <groupId>com.velocitypowered</groupId>
++      <artifactId>velocity-native</artifactId>
++      <version>1.1.9</version>
++    </dependency>
      <dependency>
        <groupId>io.netty</groupId>
        <artifactId>netty-handler</artifactId>
@@ -34,7 +55,7 @@ index d5dcc0d44..7d6f94712 100644
        <type>jar</type>
        <scope>compile</scope>
        <classifier>linux-x86_64</classifier>
-@@ -94,7 +94,7 @@
+@@ -94,7 +105,7 @@
      <dependency>
        <groupId>io.netty</groupId>
        <artifactId>netty-transport-native-kqueue</artifactId>
@@ -74,12 +95,13 @@ index 000000000..d645e7c99
 +}
 diff --git a/src/main/java/com/canyonmodded/network/NettyBootstrap.java b/src/main/java/com/canyonmodded/network/NettyBootstrap.java
 new file mode 100644
-index 000000000..0e58eeff5
+index 000000000..c23b12ceb
 --- /dev/null
 +++ b/src/main/java/com/canyonmodded/network/NettyBootstrap.java
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,139 @@
 +package com.canyonmodded.network;
 +
++import com.velocitypowered.natives.util.Natives;
 +import io.netty.bootstrap.ServerBootstrap;
 +import io.netty.channel.*;
 +import io.netty.channel.epoll.Epoll;
@@ -144,6 +166,7 @@ index 000000000..0e58eeff5
 +        } else {
 +            MinecraftServer.log.info("Using NIO channel type");
 +        }
++        MinecraftServer.log.info("Using " + Natives.compress.getLoadedVariant() + " compression from Velocity");
 +    }
 +
 +    public void bind() {
@@ -384,14 +407,18 @@ index 000000000..6d23f8ae4
 +}
 diff --git a/src/main/java/com/canyonmodded/network/PacketEncoder.java b/src/main/java/com/canyonmodded/network/PacketEncoder.java
 new file mode 100644
-index 000000000..5317f40dd
+index 000000000..69a7491d9
 --- /dev/null
 +++ b/src/main/java/com/canyonmodded/network/PacketEncoder.java
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,76 @@
 +package com.canyonmodded.network;
 +
++import com.velocitypowered.natives.compression.VelocityCompressor;
++import com.velocitypowered.natives.util.MoreByteBufUtils;
++import com.velocitypowered.natives.util.Natives;
 +import io.netty.buffer.ByteBuf;
 +import io.netty.buffer.ByteBufOutputStream;
++import io.netty.buffer.Unpooled;
 +import io.netty.channel.ChannelHandlerContext;
 +import io.netty.handler.codec.MessageToByteEncoder;
 +import io.netty.util.Recycler;
@@ -403,28 +430,61 @@ index 000000000..5317f40dd
 +import java.util.zip.DeflaterOutputStream;
 +
 +public class PacketEncoder extends MessageToByteEncoder<Packet> {
++    private final VelocityCompressor compressor = Natives.compress.get().create(-1);
++
 +    @Override
 +    protected void encode(ChannelHandlerContext ctx, Packet packet, ByteBuf buf) throws Exception {
 +        DataOutputStream out = new DataOutputStream(new ByteBufOutputStream(buf));
 +        if (packet instanceof Packet51MapChunk && ((Packet51MapChunk) packet).g == null) {
 +            // CraftBukkit moves map chunk compression out of the main thread (good) but effectively makes it single
 +            // threaded (bad). Compress the packets here instead, where we can take advantage of multiple cores.
-+            this.handleCompressingMapChunk((Packet51MapChunk) packet, out);
++            this.handleCompressingMapChunk(ctx, (Packet51MapChunk) packet, buf, out);
 +            return;
 +        }
 +        Packet.a(packet, out);
 +    }
 +
-+    private void handleCompressingMapChunk(Packet51MapChunk packet, DataOutputStream out) throws Exception {
-+        ByteArrayOutputStream compressed = new ByteArrayOutputStream();
-+        try (DeflaterOutputStream dos = new DeflaterOutputStream(compressed)) {
-+            dos.write(packet.rawData);
-+        }
-+        packet.g = compressed.toByteArray();
-+        packet.h = compressed.size();
-+        packet.k = true;
-+
++    private void handleCompressingMapChunk(ChannelHandlerContext ctx, Packet51MapChunk packet, ByteBuf buf, DataOutputStream out) throws Exception {
 +        Packet.a(packet, out);
++
++        final ByteBuf rawChunkData = Unpooled.wrappedBuffer(packet.rawData);
++        final ByteBuf compatibleIn = MoreByteBufUtils.ensureCompatible(ctx.alloc(), this.compressor, rawChunkData);
++        buf.writerIndex(buf.writerIndex() + 4);
++        final int startCompressed = buf.writerIndex();
++        int compressedLength;
++        try {
++            this.compressor.deflate(compatibleIn, buf);
++        } finally {
++            compressedLength = buf.writerIndex() - startCompressed;
++            compatibleIn.release();
++        }
++        buf.setInt(startCompressed - 4, compressedLength);
++        packet.k = true;
++    }
++
++    @Override
++    protected ByteBuf allocateBuffer(ChannelHandlerContext ctx, Packet packet, boolean preferDirect) throws Exception {
++        byte[] rawChunkData;
++        if (packet instanceof Packet51MapChunk && (rawChunkData = ((Packet51MapChunk) packet).rawData) != null) {
++            // the amount of bytes in an uncompressed map chunk packet always is:
++            //    4(int) + 2(short) + 4(int) + 3(byte) + 4(int) + (n(the length of rawData byte[]) * 1(byte))
++            //
++            // we allocate uncompressed bytes plus 1 byte, this cover two cases:
++            // - compression
++            //    according to https://github.com/ebiggers/libdeflate/blob/master/libdeflate.h#L103,
++            //    if the data compresses well (and we do not have some pathological case) then the maximum
++            //    size the compressed size will ever be is the input size minus one.
++            // - uncompressed
++            //    this is fairly obvious - we will then have one more than the uncompressed size.
++            final int initialSize = 17 + rawChunkData.length + 1;
++            return MoreByteBufUtils.preferredBuffer(ctx.alloc(), this.compressor, initialSize);
++        }
++        return super.allocateBuffer(ctx, packet, preferDirect);
++    }
++
++    @Override
++    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
++        this.compressor.close();
 +    }
 +}
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
@@ -752,6 +812,22 @@ index 7bf2f6713..66a440b93 100644
      }
  
      public void a(DataOutputStream dataoutputstream) throws java.io.IOException { // Canyon - fix decompile
+diff --git a/src/main/java/net/minecraft/server/Packet51MapChunk.java b/src/main/java/net/minecraft/server/Packet51MapChunk.java
+index 3bf163f62..f740396d6 100644
+--- a/src/main/java/net/minecraft/server/Packet51MapChunk.java
++++ b/src/main/java/net/minecraft/server/Packet51MapChunk.java
+@@ -84,6 +84,11 @@ public class Packet51MapChunk extends Packet {
+         dataoutputstream.write(this.d - 1);
+         dataoutputstream.write(this.e - 1);
+         dataoutputstream.write(this.f - 1);
++        // Canyon start - write the compressed data later in our packet encoder
++        if (this.g == null) {
++            return;
++        }
++        // Canyon end
+         dataoutputstream.writeInt(this.h);
+         dataoutputstream.write(this.g, 0, this.h);
+     }
 diff --git a/src/main/java/net/minecraft/server/ThreadLoginVerifier.java b/src/main/java/net/minecraft/server/ThreadLoginVerifier.java
 index 4d98e6ada..306db21c9 100644
 --- a/src/main/java/net/minecraft/server/ThreadLoginVerifier.java
@@ -778,5 +854,5 @@ index 4d98e6ada..306db21c9 100644
  
                  if (event.getResult() != PlayerPreLoginEvent.Result.ALLOWED) {
 -- 
-2.33.0
+2.47.0.windows.2
 

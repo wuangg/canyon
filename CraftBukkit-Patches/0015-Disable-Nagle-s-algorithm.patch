@@ -1,14 +1,14 @@
-From 0ddf876905c530bd6ee8db2f29c2ea55fec491c7 Mon Sep 17 00:00:00 2001
+From d39bfde8ffd6c5b2e4682dc5348b2b4b9e406975 Mon Sep 17 00:00:00 2001
 From: Andrew Steinborn <git@steinborn.me>
 Date: Sun, 6 Oct 2019 17:06:39 -0400
 Subject: [PATCH] Disable Nagle's algorithm
 
 
 diff --git a/src/main/java/com/canyonmodded/network/NettyBootstrap.java b/src/main/java/com/canyonmodded/network/NettyBootstrap.java
-index 0e58eeff5..c4bf01960 100644
+index c23b12ceb..89e3e7f55 100644
 --- a/src/main/java/com/canyonmodded/network/NettyBootstrap.java
 +++ b/src/main/java/com/canyonmodded/network/NettyBootstrap.java
-@@ -76,6 +76,8 @@ public class NettyBootstrap {
+@@ -78,6 +78,8 @@ public class NettyBootstrap {
                      @Override
                      protected void initChannel(Channel channel) throws Exception {
                          channel.config().setOption(ChannelOption.IP_TOS, 24);
@@ -30,5 +30,5 @@ index 856189308..e393ad566 100644
              this.output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 5120));
          } catch (java.io.IOException socketexception) {
 -- 
-2.33.0
+2.47.0.windows.2
 

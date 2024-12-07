@@ -1,4 +1,4 @@
-From 103de72b990eee8093de49084b863d53f895c90a Mon Sep 17 00:00:00 2001
+From ce6efebcb12991d170ae7fdd9fff9dd025932da3 Mon Sep 17 00:00:00 2001
 From: Andrew Steinborn <git@steinborn.me>
 Date: Tue, 8 Oct 2019 01:23:37 -0400
 Subject: [PATCH] Fix JLine issue on Windows
@@ -8,10 +8,10 @@ creating temporary files. Change our implementation version to omit
 double quotes.
 
 diff --git a/pom.xml b/pom.xml
-index 7d6f94712..f5e3bf357 100644
+index a7cd26be2..7e474a930 100644
 --- a/pom.xml
 +++ b/pom.xml
-@@ -104,6 +104,7 @@
+@@ -115,6 +115,7 @@
    <build>
      <defaultGoal>clean install</defaultGoal>
      <plugins>
@@ -19,7 +19,7 @@ index 7d6f94712..f5e3bf357 100644
        <plugin>
          <groupId>com.lukegb.mojo</groupId>
          <artifactId>gitdescribe-maven-plugin</artifactId>
-@@ -120,7 +121,24 @@
+@@ -131,7 +132,24 @@
              </goals>
            </execution>
          </executions>
@@ -45,5 +45,5 @@ index 7d6f94712..f5e3bf357 100644
          <groupId>org.apache.maven.plugins</groupId>
          <artifactId>maven-jar-plugin</artifactId>
 -- 
-2.33.0
+2.47.0.windows.2
 

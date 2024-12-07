@@ -1,14 +1,14 @@
-From aef35f1a55efad4933766776437dee2a45915afe Mon Sep 17 00:00:00 2001
+From be03c4b355bacdef62a28a3c1345a1b74b4d95be Mon Sep 17 00:00:00 2001
 From: Andrew Steinborn <git@steinborn.me>
 Date: Thu, 19 Mar 2020 04:32:11 -0400
 Subject: [PATCH] Allow delaying chunk unloading
 
 
 diff --git a/pom.xml b/pom.xml
-index 50f8472b0..c37ec7fef 100644
+index eba475d6a..25b284575 100644
 --- a/pom.xml
 +++ b/pom.xml
-@@ -26,6 +26,10 @@
+@@ -31,6 +31,10 @@
        <id>bukkit-repo</id>
        <url>https://raw.githubusercontent.com/canyonmodded/mc-server/main</url> <!-- Canyon: replace repo -->
      </repository>
@@ -19,7 +19,7 @@ index 50f8472b0..c37ec7fef 100644
    </repositories>
    <pluginRepositories>
      <pluginRepository>
-@@ -107,6 +111,13 @@
+@@ -118,6 +122,13 @@
        <scope>compile</scope>
        <classifier>osx-x86_64</classifier>
      </dependency>
@@ -33,7 +33,7 @@ index 50f8472b0..c37ec7fef 100644
    </dependencies>
    <!-- This builds a completely 'ready to start' jar with all dependencies inside -->
    <build>
-@@ -196,13 +207,6 @@
+@@ -207,13 +218,6 @@
              <goals>
                <goal>shade</goal>
              </goals>
@@ -141,5 +141,5 @@ index f3fc7d195..de15f8c31 100644
      }
  
 -- 
-2.33.0
+2.47.0.windows.2
 

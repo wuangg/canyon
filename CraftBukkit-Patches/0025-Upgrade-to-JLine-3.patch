@@ -1,14 +1,14 @@
-From 08ecd6116467464efdd29f9ba136b6b845aaa27a Mon Sep 17 00:00:00 2001
+From 4f11d280a88bcfc665f4ddbafe5df7472b0006e7 Mon Sep 17 00:00:00 2001
 From: Andrew Steinborn <git@steinborn.me>
 Date: Thu, 19 Mar 2020 01:47:18 -0400
 Subject: [PATCH] Upgrade to JLine 3
 
 
 diff --git a/pom.xml b/pom.xml
-index f5e3bf357..50f8472b0 100644
+index 7e474a930..eba475d6a 100644
 --- a/pom.xml
 +++ b/pom.xml
-@@ -55,10 +55,18 @@
+@@ -60,10 +60,18 @@
        <type>jar</type>
        <scope>compile</scope>
      </dependency>
@@ -269,5 +269,5 @@ index 111123f5c..7b7ae23ec 100644
 +    // Canyon end
  }
 -- 
-2.33.0
+2.47.0.windows.2
 
